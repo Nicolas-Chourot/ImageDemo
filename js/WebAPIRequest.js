@@ -2,8 +2,8 @@
     Méthodes d'accès aux services Web API_Server/bookmarks
  */
 
-//const apiBaseURL= "http://localhost:5000";
-const apiBaseURL= "https://pushy-observant-case.glitch.me";
+const apiBaseURL= "http://localhost:5000";
+//const apiBaseURL= "https://pushy-observant-case.glitch.me";
 
 function tokenRequestURL() {
     return apiBaseURL + '/token';
@@ -23,28 +23,14 @@ function getBearerAuthorizationToken() {
 function registerRequestURL() {
     return apiBaseURL + '/Accounts/register';
 }
-function storeLoggedUsername(username) {
-    localStorage.setItem('username', username);
+function storeLoggedUser(user) {
+    localStorage.setItem('user', JSON.stringify(user));
 }
-function retrieveLoggedUsername() {
-    return localStorage.getItem('username');
-}
-function storeLoggedUserId(userid) {
-    localStorage.setItem('userid', userid);
-}
-function retrieveLoggedUserId() {
-    return parseInt(localStorage.getItem('userid'));
-}
-function storeLoggedUserEmail(email) {
-    localStorage.setItem('useremail', email);
-}
-function retrieveLoggedUserEmail() {
-    return localStorage.getItem('useremail');
+function retrieveLoggedUser() {
+    return JSON.parse(localStorage.getItem('user'));
 }
 function deConnect() {
-    localStorage.removeItem('username');
-    localStorage.removeItem('userid');
-    localStorage.removeItem('useremail');
+    localStorage.removeItem('user');
     eraseAccessToken();
 }
 function webAPI_Register(profil, successCallBack, errorCallBack){
@@ -69,10 +55,8 @@ function webAPI_ChangeProfil( profil , successCallBack, errorCallBack) {
         headers: getBearerAuthorizationToken(),
         contentType:'application/json',
         data: JSON.stringify(profil),
-        success: (data) => {
-            storeLoggedUsername(profil.Name);
-            storeLoggedUserEmail(profil.Email);
-            successCallBack(); 
+        success: () => {
+            webAPI_getUserInfo(profil.Id, successCallBack, errorCallBack);
         },
         error: function(jqXHR, textStatus, errorThrown) {
             errorCallBack(jqXHR.status);
@@ -86,15 +70,28 @@ function webAPI_login( Email, Password, successCallBack, errorCallBack) {
         contentType:'application/json',
         type: 'POST',
         data: JSON.stringify({Email, Password}),
-        success: function (response) {
-            console.log(response);
-            storeAccessToken(response.Access_token);
-            storeLoggedUsername(response.Username);
-            storeLoggedUserEmail(Email);
-            storeLoggedUserId(response.UserId);
-            successCallBack();
+        success: function (profil) {
+            storeAccessToken(profil.Access_token);
+            webAPI_getUserInfo(profil.UserId, successCallBack, errorCallBack);
         },
         error: function(jqXHR, textStatus, errorThrown) {  
+            errorCallBack(jqXHR.status);
+            console.log("webAPI_login - error");
+        }
+    })
+}
+function webAPI_getUserInfo(userId, successCallBack, errorCallBack) {
+    $.ajax({
+        url: apiBaseURL + "/Accounts/index" + "/" + userId,
+        type: 'GET',
+        contentType:'text/plain',
+        data:{},
+        success: function (profil) {
+            console.log(profil);
+            storeLoggedUser(profil);
+            successCallBack();
+        },
+        error: function(jqXHR) {  
             errorCallBack(jqXHR.status);
             console.log("webAPI_login - error");
         }
@@ -111,7 +108,8 @@ function webAPI_logout(userId, successCallBack, errorCallBack) {
             deConnect();
             successCallBack(); 
         },
-        error: function(jqXHR, textStatus, errorThrown) {
+        error: function(jqXHR) {
+            deConnect();
             errorCallBack(jqXHR.status);
             console.log("webAPI_logout - error");
         }
@@ -125,7 +123,7 @@ function webAPI_HEAD(successCallBack, errorCallBack) {
         complete: function(request) { 
             console.log(request.getResponseHeader('ETag'));
             successCallBack(request.getResponseHeader('ETag'));},
-        error: function(jqXHR, textStatus, errorThrown) {
+        error: function(jqXHR) {
             errorCallBack(jqXHR.status);
             console.log("webAPI_GET_ALL - error");
         }
@@ -138,7 +136,7 @@ function webAPI_GET_ALL(queryString, successCallBack, errorCallBack) {
         contentType:'text/plain',
         data:{},
         success: data => { successCallBack(data);},
-        error: function(jqXHR, textStatus, errorThrown) {
+        error: function(jqXHR) {
             errorCallBack(jqXHR.status);
             console.log("webAPI_GET_ALL - error");
         }
@@ -151,7 +149,7 @@ function webAPI_GET( id, successCallBack, errorCallBack) {
         contentType:'text/plain',
         data:{},
         success: data  => { successCallBack(data);},
-        error: function(jqXHR, textStatus, errorThrown) {
+        error: function(jqXHR) {
             errorCallBack(jqXHR.status);
             console.log("webAPI_GET - error");
         }
@@ -164,8 +162,8 @@ function webAPI_POST( data , successCallBack, errorCallBack) {
         headers: getBearerAuthorizationToken(),
         contentType:'application/json',
         data: JSON.stringify(data),
-        success: (data) => {successCallBack(); },
-        error: function(jqXHR, textStatus, errorThrown) {
+        success: () => {successCallBack();},
+        error: function(jqXHR) {
             errorCallBack(jqXHR.status);
             console.log("webAPI_POST - error");
         }
@@ -178,8 +176,8 @@ function webAPI_PUT(data, successCallBack, errorCallBack) {
         headers: getBearerAuthorizationToken(),
         contentType:'application/json',
         data: JSON.stringify(data),
-        success:(s) => {successCallBack();  },
-        error: function(jqXHR, textStatus, errorThrown) {
+        success:() => {successCallBack();},
+        error: function(jqXHR) {
             errorCallBack(jqXHR.status);
             console.log("webAPI_PUT - error");
         }
@@ -192,7 +190,7 @@ function webAPI_DELETE( id, successCallBack, errorCallBack) {
         type: 'DELETE',
         headers: getBearerAuthorizationToken(),
         success:() => {successCallBack(); },
-        error: function(jqXHR, textStatus, errorThrown) {
+        error: function(jqXHR) {
             errorCallBack(jqXHR.status);
             console.log("webAPI_DELETE - error");
         }
@@ -204,8 +202,8 @@ function webAPI_DELETE_Account( id, successCallBack, errorCallBack) {
         contentType:'text/plain',
         type: 'DELETE',
         headers: getBearerAuthorizationToken(),
-        success:() => {successCallBack(); },
-        error: function(jqXHR, textStatus, errorThrown) {
+        success:() => {localStorage.clear() ;successCallBack(); },
+        error: function(jqXHR) {
             errorCallBack(jqXHR.status);
             console.log("webAPI_DELETE_Account - error");
         }
