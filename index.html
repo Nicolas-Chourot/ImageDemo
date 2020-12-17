@@ -49,7 +49,10 @@
             <!---TITLE AND USER CONNECTION UI------------------------------------------------------->
             <div class="title-container">
                 <h1><img src="images/favicon.png" style="height: 60px; margin-right:8px;float:left;">Gestionnaire de photos </h1>
-                <div style="margin-top:26px;text-align:right;"><h4 id="username">non connecté</h4></div>
+                <div style="margin-top:26px;text-align:right;">
+                    <div id="avatarContainer"></div>
+                    <h4 id="username">non connecté</h4>
+            </div>
                 <div style="margin-top:30px;text-align:right;">
                     <div id="btn_OpenLoginForm" tooltip="Connexion"  tooltip-position="left">
                         <span id="showSearchIcon" class="giconBig glyphicon glyphicon-log-in" >&nbsp;</span>
@@ -133,11 +136,18 @@
         <!---PROFIL DIALOG-------------------------------------------------------------------------->
         <div id="dialog-profilForm" title="Profil" class="dialog">
             <form id="profilForm" class="form-group">
+                <input type="hidden" id="avatarGUID" />
+                <input type="hidden" id="profilId" />
                 <input type="text" id="profilUsername" placeholder="Nom d'usager"  class="form-control"/>
                 <input type="text" id="profilEmail" placeholder="Courriel"  class="form-control"/>
                 <input type="password" id="profilPassword" placeholder="Mot de passe"  class="form-control"/>
                 <br>
                 <input type="password" id="profilConfirmPassword" placeholder="Confirmation"  class="form-control"/>
+                <br>
+                <div style="vertical-align:top; text-align: center ">
+                    <div class='imageDownloader' id = 'avatar' defautImageSrc='images/No_Avatar.png'></div>
+                    <label>(cliquez pour la changer l'avatar)</label>
+                </div>
             </form>
         </div>
 
@@ -247,7 +257,7 @@
                     $("#photoShared").prop("checked",true);
                     /// Tres important si on veut que la photo par defaut soit affichée dans le dialogue
                     setImageDownloaderBlankImage('photo');
-                    $("#photoUserId").val( retrieveLoggedUserId());
+                    $("#photoUserId").val(retrieveLoggedUser().Id);
                     $("#btn_OpenAddphotoDialog").hide();
                 });
                 $('#dialog-photoForm').on('dialogclose', function(event) {
@@ -288,7 +298,6 @@
             }
             
             function makephotoFromphotoForm(includeId = false) {
-                let formatSpecifier = "data:image/png;base64,";
                 if (includeId) {
                     // Récupération du Id du photo dans le contrôle caché
                     return {Id: parseInt($('#photoId').val()), 
@@ -317,7 +326,6 @@
                 webAPI_GET(photoId, confirmDeletephoto, AlertError);
             }
             function confirmDeletephoto(photo) {
-                console.log(photo)
                 $.confirm({
                     title: 'Retrait de photos',
                     content: '<b>' + photo.Title +'</b>?',
@@ -340,10 +348,12 @@
                                 id : 'btn-SaveProfil',
                                 text : 'Enregister',
                                 click : function() {
-                                    let profilFromForm = {  Id :  retrieveLoggedUserId(),
+                                    let profilFromForm = {  Id: parseInt($("#profilId").val()),
                                                             Name: $("#profilUsername").val(),
                                                             Email: $("#profilEmail").val(),
                                                             Password: $("#profilPassword").val(),
+                                                            AvatarGUID: $("#avatarGUID").val(),
+                                                            ImageData : getImageData('avatar')
                                                         }
                                     if (connected)
                                         webAPI_ChangeProfil(profilFromForm, ()=>{$("#dialog-profilForm").dialog( "close" ); updateUI(true);}, AlertError);
@@ -371,19 +381,26 @@
                         });
                 $('#dialog-profilForm').on('dialogopen', function(event) {
                     pausephotosListPeriodicRefresh = true;
+                    $("#profilId").val(0);
                     $('#btn-SaveProfil').addClass("btn btn-primary");
                     $('#btn-deleteProfil').addClass("btn btn-danger");
                     $('#btn-CancelProfil').addClass("btn btn-secondary");
                     if (connected) {
                         $('#dialog-profilForm').dialog('option', 'title', 'Modification de votre profil...');
-                        $('#profilUsername').val(retrieveLoggedUsername());
-                        console.log(retrieveLoggedUserEmail());
-                        $('#profilEmail').val(retrieveLoggedUserEmail());
+                        $("#profilId").val(retrieveLoggedUser().Id);
+                        $('#profilUsername').val(retrieveLoggedUser().Name);
+                        $('#profilEmail').val(retrieveLoggedUser().Email);
+                        $('#avatarGUID').val(retrieveLoggedUser().AvatarGUID);
+                        if (retrieveLoggedUser().AvatarURL != "")
+                            setImageDownloaderImage('avatar', retrieveLoggedUser().AvatarURL);
+                        else
+                            setImageDownloaderBlankImage('avatar');
                         $('#btn-deleteProfil').show();
                     } else {
                         $('#dialog-profilForm').dialog('option', 'title', 'Création de compte...');
                         $('#profilUsername').val("");
                         $('#profilEmail').val("");
+                        setImageDownloaderBlankImage('avatar');
                         $('#btn-deleteProfil').hide();
                     }
                     $('#profilPassword').val("");
@@ -399,7 +416,6 @@
             }
             function OpenProfilDialog() {
                 pausephotosListPeriodicRefresh = true;
-                console.log("OpenProfilDialog")
                 $("#dialog-profilForm" ).dialog('open');
             }
             function confirmDeleteAccount() {
@@ -411,11 +427,8 @@
                         confirmer:  
                             function () {
                                 if (connected) {
-                                    webAPI_DELETE_Account(retrieveLoggedUserId(), 
+                                    webAPI_DELETE_Account(retrieveLoggedUser().Id, 
                                         function () {
-                                            localStorage.setItem('rememberme', "0");
-                                            localStorage.removeItem('loginemail');
-                                            localStorage.removeItem('loginpassword');
                                             closeAllDialog();
                                             pausephotosListPeriodicRefresh = false;
                                             forceLogout();
@@ -442,8 +455,8 @@
                                 webAPI_login($( "#loginEmail").val(), 
                                                 $("#loginPassword").val(), 
                                                 ()=>{
-                                                        $("#dialog-loginForm").dialog( "close" ); 
-                                                        updateUI(true);
+                                                    $("#dialog-loginForm").dialog( "close" ); 
+                                                    updateUI(true);
                                                 }, 
                                                 failLogin);
                             }
@@ -490,7 +503,7 @@
                     buttons: {
                         confirmer: function () {
                             pausephotosListPeriodicRefresh = false;
-                            webAPI_logout(retrieveLoggedUserId(), updateUI, AlertError);
+                            webAPI_logout(retrieveLoggedUser().Id, updateUI, AlertError);
                         },
                         annuler: {},
                     }
@@ -502,17 +515,11 @@
                 $("#dialog-loginForm" ).dialog( 'open' );
             }
             function setUsername(username) {
-                $("#username").html("<span id='link_OpenProfilDialog' style='color:blue;' tooltip='Modifier votre profil' class='clickable'>" + username.toString() + "</span>");
+                $("#username").html("<span id='link_OpenProfilDialog' style='color:blue;' tooltip='Modifier votre profil' class='clickable'>" + username + "</span>");
                 $("#link_OpenProfilDialog").click(OpenProfilDialog);
             }
             function unsetUsername() {
                 $("#username").html("<span style='color:gray'>non connecté</span>");
-            }
-            function successLogin() {
-                Alert("Connexion réussie");
-                connected = true;
-                setUsername(retrieveLoggedUsername());
-                updateUI(true);
             }
             function failLogin() {
                 Alert("Connexion échouée");
@@ -521,18 +528,23 @@
                 updateUI(true);
             }       
             function updateConnected() {
-                let username = retrieveLoggedUsername();
-                let userid = retrieveLoggedUserId();
-                connected = (username != null);
-                console.log("updateConnected", username, userid, connected)
+                connected = false;
+                let username="";
+                if (retrieveLoggedUser() != null) {
+                    username = retrieveLoggedUser().Name;
+                    connected = true;
+                }
                 if (connected) {
-                    setUsername(username );
+                    setUsername(username);
+                    $("#avatarContainer").empty();
+                    $("#avatarContainer").append(html_fittedImage(retrieveLoggedUser().AvatarURL,'avatar'));
                     $("#btn_OpenLoginForm").hide();
                     $("#btn_OpenConfirmLogout").show();
                     $("#btn_OpenAddphotoDialog").show();
                     $('#btn_OpenProfilDialog').attr("tooltip", "Profil");
                 }
                 else {
+                    $("#avatarContainer").empty();
                     unsetUsername();
                     $("#btn_OpenLoginForm").show();
                     $("#btn_OpenConfirmLogout").hide();
@@ -646,14 +658,14 @@
                 if (ETag != currentETag) {
                     webAPI_GET_ALL(queryString, updatephotoList, AlertError);
                     currentETag = ETag;
-                    console.log("new ETag Downloading photos")
+                    console.log("new ETag Downloading photos");
                 } else {
                    if (previousQueryString != queryString || forceRefreshphotoList){
                         webAPI_GET_ALL(queryString, updatephotoList, AlertError);
                         previousQueryString = queryString;
-                        console.log("new queryString Downloading photos")
+                        console.log("new queryString Downloading photos");
                     } else {
-                            console.log("photos list up to date")
+                            console.log("photos list up to date");
                     }
                 }
             }
@@ -813,7 +825,7 @@
                 if (url.slice(-1) != '/') url += '/';
                 url = "http://www.google.com/s2/favicons?sz=64&domain=" + url;
                 return '<div class="favicon" style="background-image: url(' + url + ');"></div>';
-            }    
+            }
             function html_fittedImage(url, css=''){
                 return " <div class='"+css+"' style='background:url("+url+") no-repeat center; background-size: cover; margin-right:5px;'></div>";
             }
@@ -838,8 +850,8 @@
 
             function updatephotoList(photos){
                 $('#photoList').empty();
-                let loggedUserId = retrieveLoggedUserId();
-                if (!isNaN(loggedUserId)){
+                let loggedUserId = (retrieveLoggedUser()?retrieveLoggedUser().Id:null);
+                if (loggedUserId){
                     photos.forEach(photo => {
                         console.log(photo);
                         if (photo.UserId == loggedUserId || photo.Shared)
@@ -856,7 +868,7 @@
                 var oddRow = true;
                 // effacer le tableau affichant la liste des photos
                 $('#photoList').empty();
-                let loggedUserId = retrieveLoggedUserId();
+                let loggedUserId = retrieveLoggedUser().Id;
                 // pour tous les photos du tableau photos
                 photos.forEach(photo => { // créer une nouvelle rangée
 
