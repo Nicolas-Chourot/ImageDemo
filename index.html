@@ -82,7 +82,7 @@
                 <!---SEARCH BAR--------------------------------------------------------------------->
                 <div class="searchBar columns-layout">
                     <div><input type="search" placeholder="Titre..." id="search_title"></div>
-                    <div><input type="search" placeholder="Date..." id="search_created"></div>
+                    <div><!--<input type="search" placeholder="Date..." id="search_created">--></div>
                     <div><input type="search" placeholder="Usager..." id="search_user"></div>
                     <div></div>
                     <div></div>
@@ -163,7 +163,7 @@
             let queryString = "";
             let search = "";
             let searchShowed = false;
-            let sorted = [{field:"Username", desc:false}, {field:"Title", desc:false}];
+            let sorted = [{field:"Created", desc:true}];
             let forceRefreshphotoList = false;
             let currentETag = "";
             let previousQueryString = ""; 
@@ -590,7 +590,7 @@
             function updateSearch(){ 
                 search = "";
                 addSearchKey("title", $("#search_title").val());                
-                addSearchKey("created", $("#search_created").val());
+                //addSearchKey("date", $("#search_created").val());
                 addSearchKey("username", $("#search_user").val());
                 
                 if (search != "") {
@@ -841,6 +841,7 @@
                 let loggedUserId = retrieveLoggedUserId();
                 if (!isNaN(loggedUserId)){
                     photos.forEach(photo => {
+                        console.log(photo);
                         if (photo.UserId == loggedUserId || photo.Shared)
                             $('#photoList').append(thumbNail(photo, loggedUserId));
                     });
